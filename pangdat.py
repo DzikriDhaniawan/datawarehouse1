@@ -1,62 +1,42 @@
-import pandas as pd
-from pyspark.sql import SparkSession
 import os
 import pdfplumber
 
-print(os.getcwd())
-os.chdir('C:/Users/Dzikri/Documents/SEMESTER 2')
+# Menentukan direktori tempat file PDF berada
+pdf_directory = r"C:/Users/Dzikri/Downloads"
 
-# Path JDBC driver
-jdbc_driver_path = r"C:\pangkalandata\drivers\mysql-connector-java-8.0.30.jar"
+# Mencari file PDF terbaru di direktori
+pdf_files = [f for f in os.listdir(pdf_directory) if f.endswith('.pdf')]
+latest_pdf_file = max([os.path.join(pdf_directory, f) for f in pdf_files], key=os.path.getmtime)
 
-# Path file Excel
-file_path = r"C:\pangkalandata\FinancialStatement-2023-Tahunan-AALI.xlsx"
-# Path file PDF
-pdf_file_path = r'C:\pangkalandata\laporan.pdf'
-
-# Membuat SparkSession dan menambahkan konfigurasi untuk MySQL JDBC driver
-spark = SparkSession.builder \
-    .appName("Import Data to MySQL") \
-    .config("spark.jars", jdbc_driver_path) \
-    .getOrCreate()
-
-# Membaca data dari Excel menggunakan pandas
-laba_rugi_df = pd.read_excel(file_path, sheet_name="1321000", header=28)
-arus_kas_df = pd.read_excel(file_path, sheet_name="1510000", header=179)
-laporan_neraca_df = pd.read_excel(file_path, sheet_name="SheetName")  # Ganti dengan nama sheet yang benar
-
-# Konversi DataFrame pandas ke DataFrame PySpark
-laba_rugi_spark = spark.createDataFrame(laba_rugi_df)
-arus_kas_spark = spark.createDataFrame(arus_kas_df)
-laporan_neraca_spark = spark.createDataFrame(laporan_neraca_df)
-
-# Mengatur koneksi JDBC ke MySQL
-jdbc_url = "jdbc:mysql://localhost:3306/financial_data"
-connection_properties = {
-    "user": "root",
-    "password": "",  # Ganti dengan password MySQL Anda
-    "driver": "com.mysql.cj.jdbc.Driver"
-}
-
-# Menyimpan DataFrame PySpark ke tabel MySQL
-laba_rugi_spark.write.jdbc(url=jdbc_url, table="laba_rugi", mode="overwrite", properties=connection_properties)
-arus_kas_spark.write.jdbc(url=jdbc_url, table="arus_kas", mode="overwrite", properties=connection_properties)
-laporan_neraca_spark.write.jdbc(url=jdbc_url, table="laporan_neraca", mode="overwrite", properties=connection_properties)
-
-df_check = spark.read.jdbc(url=jdbc_url, table="laba_rugi", properties=connection_properties)
-df_check.show(10)
-
-# Misalkan df_spark adalah DataFrame PySpark Anda
-laba_rugi_spark.write.text("output.txt")
-
-# Membaca data dari file PDF dan menyimpannya ke file teks
-with pdfplumber.open(pdf_file_path) as pdf, open('output_pdf.txt', 'w', encoding='utf-8') as output_file:
-    for page in pdf.pages:
+# Membaca data dari file PDF terbaru
+with pdfplumber.open(latest_pdf_file) as pdf:
+    # Menyimpan teks arus kas, laba rugi, dan neraca
+    cash_flow_text = "Laporan laba rugi"
+    income_statement_text = "Laporan arus kas"
+    balance_sheet_text = "Laporan neraca"
+    
+    # Menentukan halaman yang ingin dibaca (misalnya halaman 1 hingga 10)
+    for page_number in range(1, len(pdf.pages) + 1):  # Halaman 1 hingga terakhir
+        page = pdf.pages[page_number - 1]  # Halaman dimulai dari 0
         text = page.extract_text()
-        output_file.write(text)
-        output_file.write('\n')
+        
+        if text:
+            # Mencari bagian arus kas, laba rugi, dan neraca
+            if "ARUS KAS" in text.lower():
+                cash_flow_text += text + "\n"
+            if "LAPORAN LABA RUGI" in text.lower():
+                income_statement_text += text + "\n"
+            if "LAPORAN POSISI KEUANGAN" in text.lower():
+                balance_sheet_text += text + "\n"
 
-print("Data berhasil diimpor ke MySQL dan teks dari PDF berhasil disimpan ke output_pdf.txt.")
+    # Menyimpan hasil ke file teks
+    with open('arus_kas.txt', 'w', encoding='utf-8') as cash_flow_file:
+        cash_flow_file.write(cash_flow_text)
+        
+    with open('laba_rugi.txt', 'w', encoding='utf-8') as income_statement_file:
+        income_statement_file.write(income_statement_text)
+        
+    with open('neraca.txt', 'w', encoding='utf-8') as balance_sheet_file:
+        balance_sheet_file.write(balance_sheet_text)
 
-# Tutup SparkSession
-spark.stop()
+print(f"Data arus kas, laba rugi, dan neraca dari PDF terbaru '{latest_pdf_file}' berhasil disimpan.")
