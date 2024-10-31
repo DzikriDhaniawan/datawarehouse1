@@ -21,7 +21,7 @@ spark = SparkSession.builder \
     .getOrCreate()
 
 # Membaca data dari Excel menggunakan pandas
-laba_rugi_df = pd.read_excel(file_path, sheet_name="1321000", header=29)
+laba_rugi_df = pd.read_excel(file_path, sheet_name="1321000", header=28)
 arus_kas_df = pd.read_excel(file_path, sheet_name="1510000", header=179)
 laporan_neraca_df = pd.read_excel(file_path, sheet_name="SheetName")  # Ganti dengan nama sheet yang benar
 
